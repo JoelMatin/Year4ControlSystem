@@ -1,0 +1,105 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Control System Design Lab: Sample Code
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Setup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+close all; clear all; clc; 
+openinout; %Open the ports of the analog computer.
+Ts=1/200;%Set the sampling time.
+lengthExp=20; %Set the length of the experiment (in seconds).
+N0=lengthExp/Ts; %Compute the number of points to save the datas.
+Data_ball=zeros(N0,2); %Vector saving the datas. If there are several datas to save, change "1" to the number of outputs.
+Data_motor =zeros(N0,1); 
+sample_debut = 600;
+sample_stabilisation = 100; 
+sample_step = 800;
+sample_step2 = N0-sample_debut-sample_stabilisation;
+
+
+
+voltage_debut = 5.5; 
+voltage_step = 3;
+voltage_step2 = 5; 
+voltage_stabilisation = 1.83; 
+DataCommands= [ones(sample_debut+sample_stabilisation,1)*voltage_debut; ones(sample_stabilisation,1)*voltage_stabilisation; ones(sample_step, 1)*voltage_step; ones(sample_step2, 1)*voltage_step2] ; %Vector storing the input sent to the plant.
+cond=1; %Set the condition variable to 1.
+i=1; %Set the counter to 1.
+tic %Begins the first strike of the clock.
+time=0:Ts:(N0-1)*Ts; %Vector saving the time steps.
+
+K =0.355;  
+u0 = 4;
+e_motor = 0;
+e_ball = 0; 
+u_motor = 0; 
+u_ball = 0; 
+position_old = 0;
+velocity_old = 0; 
+e_ball_old = 0; 
+u_ball_old = 0; 
+e_motor_old = 0; 
+u_motor_old = 0; 
+%% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Loop
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+while cond==1
+    [velocity,position,in3,in4,in5,in6,in7,in8]=anain; %Acquisition of the measurements. 
+    ref=DataCommands(i); %Input of the system.
+        
+    %inner loop
+    e_ball = ref - position;
+    %u_ball =  0.9802*u_ball_old +1.985*e_ball -1.976*e_ball_old;
+     %u_ball =  0.9764*u_ball_old +1.048*e_ball -1.043*e_ball_old;
+    u_ball = 0.7869*u_ball_old + 0.9677*e_ball -0.9229*e_ball_old; 
+    u_ball = 0.7*u_ball_old + 0.*e_ball -0.9229*e_ball_old; 
+
+    e_motor = u_ball - velocity
+%     if i < sample_debut
+%        u_motor = 4; 
+%     elseif i<= sample_debut + sample_stabilisation+10
+%        u_motor = 4; 
+%     else 
+%        u_motor = K*e_motor + u0
+%     end
+    
+    if i < sample_debut
+        u_motor = 2.5;
+    else
+        u_motor = K*e_motor + u0
+    end
+    anaout(u_motor,0); %Command to send the input to the analog computer.
+     
+    Data_motor(i,1)=velocity; %Save one of the measurements (in1).
+    Data_ball(i,1)=position; 
+    t=toc; %Second strike of the clock.
+    if t>i*Ts
+        disp('Sampling time too small');%Test if the sampling time is too small.
+    else
+        while toc<=i*Ts %Does nothing until the second strike of the clock reaches the sampling time set.
+        end
+    end
+    if i==N0 %Stop condition.
+        cond=0;
+    end
+    position_old = Data_ball(i);
+    velocity_old = Data_motor(i); 
+    e_ball_old = e_ball; 
+    u_ball_old = u_ball; 
+    e_motor_old = e_motor; 
+    u_motor_old = u_motor;
+    i=i+1;
+end
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Plots
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+closeinout %Close the ports.
+
+figure %Open a new window for plot.
+plot(time,Data_ball(:,1),time,Data_motor(:,1)); %Plot the experiment (input and output).
